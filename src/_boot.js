@@ -2,6 +2,15 @@ const signale = require("signale");
 const {app, BrowserWindow, dialog, shell} = require("electron");
 
 process.on("uncaughtException", e => {
+    // Ignore common network errors that are non-fatal
+    if (e.code === 'ECONNRESET' || e.code === 'ETIMEDOUT' || e.code === 'ENOTFOUND' ||
+        e.code === 'ECONNREFUSED' || e.code === 'EHOSTUNREACH' ||
+        (e.message && e.message.includes('ECONNRESET')) ||
+        (e.message && e.message.includes('socket hang up'))) {
+        signale.warn('Network error (ignored):', e.message || e.code);
+        return;
+    }
+
     signale.fatal(e);
     dialog.showErrorBox("eDEX-UI crashed", e.message || "Cannot retrieve error message.");
     if (tty) {
