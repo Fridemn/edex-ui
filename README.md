@@ -14,9 +14,11 @@
   <a href="https://github.com/GitSquared/edex-ui/releases/download/v2.2.8/eDEX-UI-Linux-arm64-AppImage" target="_blank"><img alt="undefined" src="https://badgen.net/badge/Download/LinuxArm64/?color=orange&icon=terminal&label"></a>
   <a href="https://aur.archlinux.org/packages/edex-ui" target="_blank"><img alt="undefined" src="https://badgen.net/badge/AUR/Package/cyan"></a>
   <br>
-  <a href="https://github.com/GitSquared/edex-ui/releases/tag/v2.2.8"><strong><i>(Project archived oct. 18th 2021)</i></strong></a>
+  <a href="https://github.com/GitSquared/edex-ui/releases/tag/v2.2.8"><strong><i>(Original project archived oct. 18th 2021)</i></strong></a>
   <br><br><br>
 </p>
+
+> **Note:** This repository was originally forked from [GitSquared/edex-ui](https://github.com/GitSquared/edex-ui). Because the upstream repository was archived in 2021 and no longer accepts contributions, this repository has been detached from the original fork network to facilitate independent development and maintenance.
 
 eDEX-UI is a fullscreen, cross-platform terminal emulator and system monitor that looks and feels like a sci-fi computer interface.
 
