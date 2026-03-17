@@ -192,7 +192,6 @@ function createWindow(settings) {
         backgroundColor: '#000000',
         webPreferences: {
             devTools: true,
-	    enableRemoteModule: true,
             contextIsolation: false,
             backgroundThrottling: false,
             webSecurity: true,
@@ -203,6 +202,9 @@ function createWindow(settings) {
         }
     });
 
+    // Enable @electron/remote for this window
+    require('@electron/remote/main').enable(win.webContents);
+
     win.loadURL(url.format({
         pathname: path.join(__dirname, 'ui.html'),
         protocol: 'file:',
@@ -211,6 +213,10 @@ function createWindow(settings) {
 
     signale.complete("Frontend window created!");
     win.show();
+
+    // Open DevTools for debugging
+    win.webContents.openDevTools({ mode: 'detach' });
+
     if (!settings.allowWindowed) {
         win.setResizable(false);
     } else if (!require(lastWindowStateFile)["useFullscreen"]) {

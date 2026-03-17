@@ -2,11 +2,21 @@
 <html>
     <head>
         <meta charset="utf-8" />
-        <meta http-equiv="Content-Security-Policy" content="default-src file: 'unsafe-inline'; img-src file: data:; media-src file:; connect-src ws: file:">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>eDEX-UI</title>
-
-        <!-- Load dependency css -->
+        <!-- Early error handler - must be first -->
+        <script>
+            console.log('=== eDEX-UI Renderer Starting ===');
+            window.onerror = function(msg, url, line, col, error) {
+                console.error('RENDERER ERROR:', msg, url, line, col, error);
+                alert('Error: ' + msg + '\\n at ' + url + ':' + line + ':' + col + '\\n' + (error ? error.stack : ''));
+                return true;
+            };
+            window.onunhandledrejection = function(e) {
+                console.error('UNHANDLED PROMISE REJECTION:', e);
+                alert('Unhandled Promise: ' + (e.reason ? e.reason.stack || e.reason : e));
+            };
+            console.log('Early error handler installed');
+        </script>
         <link rel="stylesheet" href="node_modules/augmented-ui/augmented.css" />
         <!-- Load main css -->
         <link rel="stylesheet" href="assets/css/main.css" />

@@ -3,12 +3,51 @@ class Terminal {
         if (opts.role === "client") {
             if (!opts.parentId) throw "Missing options";
 
-            this.xTerm = require("xterm").Terminal;
-            const {AttachAddon} = require("xterm-addon-attach");
-            const {FitAddon} = require("xterm-addon-fit");
-            const {LigaturesAddon} = require("xterm-addon-ligatures");
-            const {WebglAddon} = require("xterm-addon-webgl");
-            this.Ipc = require("electron").ipcRenderer;
+            // Use xterm modules from preload or direct require
+            let xterm, xtermAddonAttach, xtermAddonFit, xtermAddonLigatures, xtermAddonWebgl, colorModule;
+
+            try {
+                if (window.electronAPI && window.electronAPI.xterm) {
+                    xterm = window.electronAPI.xterm;
+                    xtermAddonAttach = window.electronAPI.xtermAddonAttach;
+                    xtermAddonFit = window.electronAPI.xtermAddonFit;
+                    xtermAddonLigatures = window.electronAPI.xtermAddonLigatures;
+                    xtermAddonWebgl = window.electronAPI.xtermAddonWebgl;
+                    colorModule = window.electronAPI.color;
+                } else {
+                    // Direct require when contextIsolation is false
+                    xterm = require('xterm');
+                    xtermAddonAttach = require('xterm-addon-attach');
+                    xtermAddonFit = require('xterm-addon-fit');
+                    xtermAddonLigatures = require('xterm-addon-ligatures');
+                    xtermAddonWebgl = require('xterm-addon-webgl');
+                    colorModule = require('color');
+                }
+            } catch(e) {
+                console.error('Failed to load xterm modules:', e);
+                throw new Error('Failed to load terminal modules: ' + e.message);
+            }
+
+            // Get Terminal class and addon constructors
+            this.xTerm = xterm.Terminal || xterm;
+            const AttachAddon = xtermAddonAttach.AttachAddon || xtermAddonAttach;
+            const FitAddon = xtermAddonFit.FitAddon || xtermAddonFit;
+            const LigaturesAddon = xtermAddonLigatures.LigaturesAddon || xtermAddonLigatures;
+            const WebglAddon = xtermAddonWebgl.WebglAddon || xtermAddonWebgl;
+
+            // IPC from preload or direct electron
+            if (window.electronAPI && window.electronAPI.ipcSend) {
+                this.Ipc = {
+                    send: window.electronAPI.ipcSend,
+                    on: window.electronAPI.ipcOn,
+                };
+            } else {
+                const electron = require('electron');
+                this.Ipc = {
+                    send: electron.ipcRenderer.send.bind(electron.ipcRenderer),
+                    on: (channel, callback) => electron.ipcRenderer.on(channel, callback),
+                };
+            }
 
             this.port = opts.port || 3000;
             this.cwd = "";
@@ -72,7 +111,8 @@ class Terminal {
                 });
             }
 
-            let color = require("color");
+            // Use color module from preload or direct require
+            const color = colorModule;
             let colorify;
             if (doCustomFilter) {
                 colorify = (base, target) => {
@@ -292,8 +332,15 @@ class Terminal {
                     this.term.clearSelection();
                     this.clipboard.didCopy = true;
                 },
-                paste: () => {
-                    this.write(remote.clipboard.readText());
+                paste: async () => {
+                    let text;
+                    if (window.electronAPI && window.electronAPI.clipboard) {
+                        text = await window.electronAPI.clipboard.readText();
+                    } else {
+                        const {clipboard} = require('electron');
+                        text = clipboard.readText();
+                    }
+                    this.write(text);
                     this.clipboard.didCopy = false;
                 },
                 didCopy: false

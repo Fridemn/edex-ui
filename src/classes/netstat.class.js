@@ -2,6 +2,32 @@ class Netstat {
     constructor(parentId) {
         if (!parentId) throw "Missing parameters";
 
+        // Get modules from preload or direct require
+        let https, pathModule, net, geolite2, maxmind, ipcSend;
+
+        if (window.electronAPI && window.electronAPI.nodeModules) {
+            https = window.electronAPI.nodeModules.https;
+            pathModule = window.electronAPI.nodeModules.path;
+            net = window.electronAPI.nodeModules.net;
+            geolite2 = window.electronAPI.geolite2;
+            maxmind = window.electronAPI.maxmind;
+            ipcSend = window.electronAPI.ipcSend;
+        } else {
+            https = require('https');
+            pathModule = require('path');
+            net = require('net');
+            try {
+                geolite2 = require('geolite2-redist');
+                maxmind = require('maxmind');
+            } catch(e) {
+                geolite2 = null;
+                maxmind = null;
+            }
+            const electron = require('electron');
+            ipcSend = (channel, type, msg) => electron.ipcRenderer.send(channel, type, msg);
+        }
+        this._ipcSend = ipcSend;
+
         // Create DOM
         this.parent = document.getElementById(parentId);
         this.parent.innerHTML += `<div id="mod_netstat">
@@ -30,7 +56,7 @@ class Netstat {
         this.failedAttempts = {};
         this.runsBeforeGeoIPUpdate = 0;
 
-        this._httpsAgent = new require("https").Agent({
+        this._httpsAgent = new https.Agent({
             keepAlive: false,
             maxSockets: 10
         });
@@ -45,16 +71,31 @@ class Netstat {
         this.geoLookup = {
             get: () => null
         };
-        let geolite2 = require("geolite2-redist");
-        let maxmind = require("maxmind");
-        geolite2.downloadDbs(require("path").join(require("@electron/remote").app.getPath("userData"), "geoIPcache")).then(() => {
-           geolite2.open('GeoLite2-City', path => {
-                return maxmind.open(path);
-            }).catch(e => {throw e}).then(lookup => {
-                this.geoLookup = lookup;
-                this.lastconn.finished = true;
+
+        // Get userData path via IPC or direct
+        const initGeoIP = (userDataPath) => {
+            if (geolite2 && maxmind) {
+                geolite2.downloadDbs(pathModule.join(userDataPath, "geoIPcache")).then(() => {
+                    geolite2.open('GeoLite2-City', dbPath => {
+                        return maxmind.open(dbPath);
+                    }).catch(e => {throw e}).then(lookup => {
+                        this.geoLookup = lookup;
+                        this.lastconn.finished = true;
+                    });
+                });
+            }
+        };
+
+        if (window.electronAPI && window.electronAPI.app) {
+            window.electronAPI.app.getPath('userData').then(userDataPath => {
+                initGeoIP(userDataPath);
+            }).catch(e => {
+                console.warn('GeoIP initialization failed:', e);
             });
-        });
+        } else {
+            const remote = require('@electron/remote');
+            initGeoIP(remote.app.getPath('userData'));
+        }
     }
     updateInfo() {
         window.si.networkInterfaces().then(async data => {
@@ -105,7 +146,7 @@ class Netstat {
                 offline = true;
             } else {
                 if (this.runsBeforeGeoIPUpdate === 0 && this.lastconn.finished) {
-                    this.lastconn = require("https").get({host: "myexternalip.com", port: 443, path: "/json", localAddress: net.ip4, agent: this._httpsAgent}, res => {
+                    this.lastconn = https.get({host: "myexternalip.com", port: 443, path: "/json", localAddress: net.ip4, agent: this._httpsAgent}, res => {
                         let rawData = "";
                         res.on("data", chunk => {
                             rawData += chunk;
@@ -127,9 +168,8 @@ class Netstat {
                                 if (this.failedAttempts[e] > 2) return false;
                                 console.warn(e);
                                 console.info(rawData.toString());
-                                let electron = require("electron");
-                                electron.ipcRenderer.send("log", "note", "NetStat: Error parsing data from myexternalip.com");
-                                electron.ipcRenderer.send("log", "debug", `Error: ${e}`);
+                                this._ipcSend("log", "note", "NetStat: Error parsing data from myexternalip.com");
+                                this._ipcSend("log", "debug", `Error: ${e}`);
                             }
                         });
                     }).on("error", e => {
@@ -155,8 +195,8 @@ class Netstat {
     }
     ping(target, port, local) {
         return new Promise((resolve, reject) => {
-            let s = new require("net").Socket();
-            let start = process.hrtime();
+            let s = new net.Socket();
+            let start = performance.now();
 
             s.connect({
                 port,
@@ -164,8 +204,7 @@ class Netstat {
                 localAddress: local,
                 family: 4
             }, () => {
-                let time_arr = process.hrtime(start);
-                let time = (time_arr[0] * 1e9 + time_arr[1]) / 1e6;
+                let time = performance.now() - start;
                 resolve(time);
                 s.destroy();
             });

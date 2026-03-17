@@ -1,16 +1,30 @@
 class UpdateChecker {
     constructor() {
-        let https = require("https");
-        let electron = require("electron");
-        let remote = require("@electron/remote");
-        let current = remote.app.getVersion();
+        // Get modules from preload or direct require
+        let https, currentVersion, ipcSend, shellOpenExternal;
+
+        if (window.electronAPI && window.electronAPI.nodeModules) {
+            https = window.electronAPI.nodeModules.https;
+            ipcSend = window.electronAPI.ipcSend;
+            shellOpenExternal = window.electronAPI.shell.openExternal;
+            window.electronAPI.app.getVersion().then(version => {
+                currentVersion = version;
+            });
+        } else {
+            https = require('https');
+            const electron = require('electron');
+            const remote = require('@electron/remote');
+            ipcSend = (type, level, msg) => electron.ipcRenderer.send(type, level, msg);
+            shellOpenExternal = electron.shell.openExternal;
+            currentVersion = remote.app.getVersion();
+        }
 
         this._failed = false;
         this._willfail = false;
         this._fail = e => {
             this._failed = true;
-            electron.ipcRenderer.send("log", "note", "UpdateChecker: Could not fetch latest release from GitHub's API.");
-            electron.ipcRenderer.send("log", "debug", `Error: ${e}`);
+            ipcSend("log", "note", "UpdateChecker: Could not fetch latest release from GitHub's API.");
+            ipcSend("log", "debug", `Error: ${e}`);
         };
 
         https.get({
@@ -46,17 +60,17 @@ class UpdateChecker {
                 } else {
                     try {
                         let release = JSON.parse(d.toString());
-                        if (release.tag_name.slice(1) === current) {
-                            electron.ipcRenderer.send("log", "info", "UpdateChecker: Running latest version.");
-                        } else if (Number(release.tag_name.slice(1).replace(/\./g, "")) < Number(current.replace("-pre", "").replace(/\./g, ""))) {
-                            electron.ipcRenderer.send("log", "info", "UpdateChecker: Running an unreleased, development version.");
+                        if (release.tag_name.slice(1) === currentVersion) {
+                            ipcSend("log", "info", "UpdateChecker: Running latest version.");
+                        } else if (Number(release.tag_name.slice(1).replace(/\./g, "")) < Number(currentVersion.replace("-pre", "").replace(/\./g, ""))) {
+                            ipcSend("log", "info", "UpdateChecker: Running an unreleased, development version.");
                         } else {
                             new Modal({
                                 type: "info",
                                 title: "New version available",
-                                message: `eDEX-UI <strong>${release.tag_name}</strong> is now available.<br/>Head over to <a href="#" onclick="require('electron').shell.openExternal('${release.html_url}')">github.com</a> to download the latest version.`
+                                message: `eDEX-UI <strong>${release.tag_name}</strong> is now available.<br/>Head over to <a href="#" onclick="window.openExternal('${release.html_url}')">github.com</a> to download the latest version.`
                             });
-                            electron.ipcRenderer.send("log", "info", `UpdateChecker: New version ${release.tag_name} available.`);
+                            ipcSend("log", "info", `UpdateChecker: New version ${release.tag_name} available.`);
                         }
                     } catch(e) {
                         this._fail(e);

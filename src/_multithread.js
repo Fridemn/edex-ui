@@ -1,6 +1,6 @@
 const cluster = require("cluster");
 
-if (cluster.isMaster) {
+if (cluster.isPrimary) {
     const electron = require("electron");
     const ipc = electron.ipcMain;
     const signale = require("signale");
@@ -11,7 +11,7 @@ if (cluster.isMaster) {
 
     const si = require("systeminformation");
 
-    cluster.setupMaster({
+    cluster.setupPrimary({
         exec: require("path").join(__dirname, "_multithread.js")
     });
 

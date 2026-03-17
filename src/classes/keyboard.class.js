@@ -2,7 +2,9 @@ class Keyboard {
     constructor(opts) {
         if (!opts.layout || !opts.container) throw "Missing options";
 
-        const layout = JSON.parse(require("fs").readFileSync(opts.layout, {encoding: "utf-8"}));
+        // Use fs module directly or from preload
+        const fs = (typeof window.requireModule === 'function') ? window.requireModule('fs') : require('fs');
+        const layout = JSON.parse(fs.readFileSync(opts.layout, {encoding: "utf-8"}));
         this.ctrlseq = ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""];
         this.container = document.getElementById(opts.container);
 
